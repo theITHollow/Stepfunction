@@ -1,0 +1,104 @@
+importPackage(java.util);
+importPackage(java.io);
+importPackage(com.cloupia.lib.util);
+importPackage(com.cloupia.model.cIM);
+importPackage(com.cloupia.service.cIM.inframgr);
+importPackage(org.apache.commons.httpclient);
+importPackage(org.apache.commons.httpclient.cookie);
+importPackage(org.apache.commons.httpclient.methods);
+importPackage(org.apache.commons.httpclient.auth);
+
+//var login= ctxt.getInput("LOGIN")
+//var password = ctxt.getInput("PASSWORD");
+logger.addInfo("SysID is: " + input.SysID);
+logger.addInfo("ReqID is: " + input.RequestID);
+
+var ReqID = input.RequestID;
+var SNOWid = input.SysID;
+logger.addInfo("SNOW ID is : " +SNOWid);
+
+var login = "ucs_director";
+var password = "UCSDirectorIntegration!";
+var instance = "aheaddemo1.service-now.com";
+var url = "/api/now/v2/table/change_request";
+
+// Link to Service-now documentation
+//http://wiki.servicenow.com/index.php?title=JSON_Web_Service#insert
+
+//Create a Map Hash to update fields in SNOW
+var map = new HashMap();
+map.put("description", "test from UCSD");
+map.put("comments_and_work_notes","test UCSD Work Notes");
+map.put("short_description","Machine Build from UCSD - Request " + '"' + ReqID + '"');
+map.put("assignment_group","Software");
+map.put("assigned_to","ITIL User");
+map.put("impact","3 - Low");
+map.put("urgency","3 - Low");
+map.put("category","Servers & Storage");
+map.put("u_subcategory","Other");
+map.put("justification","Need more servers");
+map.put("start_date","03-28-2016 12:52:22");
+map.put("end_date","03-30-2016 12:52:22");
+map.put("implementation_plan","Use CMP");
+map.put("test_plan","Automation");
+map.put("backout_plan","Rollback");
+map.put("u_communication_plan","Automation");
+map.put("u_risk_complex","Easy");
+map.put("u_risk_resources","1");
+map.put("u_risk_backout","<30 min");
+map.put("type","standard");
+map.put("u_originating_request",SNOWid);
+map.put("std_change_producer_version","Cloud Machine - 1");
+map.put("sysparm_action", "insert");
+map.put("priority","3 - Moderate");
+
+var data = JSON.javaToJsonString(map, map.getClass());
+
+logger.addInfo("JSON Data = "+data);
+
+
+var httpClient = new HttpClient();
+httpClient.getHostConfiguration().setHost(instance, 443, "https");
+httpClient.getParams().setAuthenticationPreemptive(true);
+httpClient.getParams().setCookiePolicy("default");
+var defaultcreds = new UsernamePasswordCredentials(login, password);
+httpClient.getState().setCredentials(new AuthScope(instance, -1, null), defaultcreds);
+
+
+var httpMethod = new PostMethod(url);
+logger.addInfo(httpMethod);
+httpMethod.setRequestEntity(new StringRequestEntity(data));
+httpMethod.addRequestHeader("Content-Type", "application/json");
+httpClient.executeMethod(httpMethod);
+var statuscode = httpMethod.getStatusCode();
+
+logger.addInfo("STATUSCODE = "+statuscode);
+
+//check to see if the REST call was made successfully
+if (statuscode != 201)
+{
+logger.addError("Ticket opening failed with code "+statuscode);
+if (statuscode == 302)
+{
+logger.addWarning("Likely cause of the failure is JSON plugin is not activated on the Service Now instance. ");
+logger.addWarning("Check documentation on how to enable the plugin: "+
+"http://wiki.servicenow.com/index.php?title=JSON_Web_Service#insert "+
+" (see section 2)");
+}
+
+httpMethod.releaseConnection();
+
+// Set this task as failed.
+ctxt.setFailed("Unable to open ticket");
+} else
+
+{
+var reader = new InputStreamReader(httpMethod.getResponseBodyAsStream());
+var resp = JSON.getJsonElement(reader, null);
+//logger.addInfo("Response = "+resp);
+//var entry = resp.get("records").get(0);
+//logger.addInfo("Ticket Number "+entry.get("number"));
+//logger.addInfo("Ticket Sys_id "+entry.get("sys_id"));
+httpMethod.releaseConnection();
+}
+
